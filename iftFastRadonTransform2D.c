@@ -26,6 +26,7 @@ void dda(iftImage *img, iftVoxel p1, iftVoxel pn)
     float H=0.0;
     iftVoxel p;
 
+
     if (p1->x == pn->x && p1->y == pn->y)
         n=1; 
     else{
@@ -46,11 +47,11 @@ void dda(iftImage *img, iftVoxel p1, iftVoxel pn)
 
     p=p1;
 
-    // calcular H como interpolacao
+    // calcular I como interpolacao
 
     for (k = 0; k < n; i++)
     {
-        img->val[(int)(p->x)][(int)(p->y)] = H;
+        //img->val[(int)(p->x)][(int)(p->y)] = I();
         p->x = p->x + dx;
         p->y = p->y + dy;
     }
@@ -58,11 +59,53 @@ void dda(iftImage *img, iftVoxel p1, iftVoxel pn)
 
 }
 
+int Intersection(iftMatrix *Tpo, iftImage *img, iftMatrix *Tn, VolumeFaces *vf, int *p1, int *pn)
+{
+    return 0;
+}
+
 /* this function applies the fast Radon transform (i.e. it uses the DDA algorithm) */
 iftImage *fastRadonTransform(iftImage *img)
 {
     float D = sqrt(img->xsize*img->xsize + img->ysize*img->ysize);
     iftImage *R = iftCreateImage(180, D, 1);
+    iftMatrix* normal;
+
+    for(int theta = 0; theta < 180; theta++) {
+        
+
+        iftMatrix *M = createRadonMatrix(img, theta);
+        iftImage *imgQ = iftCreateImage(D, D, 1);
+
+        // normal calculation
+        normal =  iftCreateMatrix(3, 1);
+        normal->val[1] = normal->val[2] = 1.0;
+        normal->val[0] = 0;
+        iftMatrix *rotMatrix = iftRotationMatrix(IFT_AXIS_Z, theta);
+        Tnorigin = iftMultMatrices(rotMatrix, normal);
+
+
+
+        for(int p = 0; p < img->n; p++) {
+            p1 = pn = -1;
+            iftMatrix *Ip = imagePixelToMatrix(img, p);
+            iftMatrix *Iq = iftMultMatrices(M, Ip);
+
+
+            if (Intersection(Iq, img, Tn, vf, &p1, &pn))
+            {
+                continue
+                /*v1 = GetVoxelCoord(img, p1);
+                vn = GetVoxelCoord(img, pn);
+
+                line = IntensityProfile(img, v1, vn);
+                intensity = LineValues->val[0];
+                for (i = 1; i < LineValues->n; i++)
+                    if (LineValues->val[i] > intensity)
+                        intensity = LineValues->val[i];
+                imgQ->val[p] = intensity;*/
+            }
+
 
 
 
