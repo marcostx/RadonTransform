@@ -4,14 +4,11 @@
 //#define GetVoxelIndex(s,v) ((v.x)+(s)->tby[(v.y)])
 
 int sign( int x ){
-    if(x > 0)
-        return 1;
-    if(x < 0) 
-        return -1;
-    return 0;
+    if(x >= 0)
+        return 1;    
+    return -1;
 }
 
-int line_len=0;
 
 
 /* this function creas the rotation/translation matrix for the given theta */
@@ -22,14 +19,11 @@ iftMatrix *createRadonMatrix(iftImage *img, int theta)
     iftVector v1 = {.x = (float)img->xsize / 2.0, .y = (float)img->ysize / 2.0, .z = 0.0};
     iftMatrix *transMatrix1 = iftTranslationMatrix(v1);
 
-    
-
     iftMatrix *rotMatrix = iftRotationMatrix(IFT_AXIS_Z, theta);
 
     float D = sqrt(img->xsize*img->xsize + img->ysize*img->ysize);
     iftVector v2 = {.x = -(D / 2.0), .y = -(D / 2.0), .z = 0.0};
     iftMatrix *transMatrix2 = iftTranslationMatrix(v2);
-
     
 
     resMatrix = iftMultMatricesChain(3, transMatrix1, rotMatrix, transMatrix2);
@@ -37,12 +31,13 @@ iftMatrix *createRadonMatrix(iftImage *img, int theta)
     return resMatrix;
 }
 
-float* DDA(iftImage *img, iftVoxel p1, iftVoxel pn)
+int DDA(iftImage *img, iftVoxel p1, iftVoxel pn)
 {
     int n, k;
-    iftVoxel p;
-    float * J;
-    float Dx=(pn.x - p1.x),Dy=(pn.y - p1.y);
+    //iftVoxel p;
+    float px, py;
+    float J=0;
+    int Dx,Dy;
     float dx=0,dy=0;
     //iftCreateMatrix* J;
 
@@ -56,33 +51,30 @@ float* DDA(iftImage *img, iftVoxel p1, iftVoxel pn)
         if( abs(Dx) >= abs(Dy) ){
             n = abs(Dx)+1;
             dx = sign(Dx);
-            dy = dx * (Dy/Dx);
+            dy = (dx * Dy)/Dx;
         }
         else{ 
             n = abs(Dy)+1;
             dy = sign(Dy);
-            dx = dy * (Dx/Dy);
+            dx = (dy * Dx)/Dy;
         }
     }
-    line_len=n;
-    J = (float*)(malloc(n*sizeof(float)));
-    p=p1;
+
+    px = p1.x;
+    py = p1.y;
+    
 
     // TODO: calcular I como interpolacao
 
-    
-    for (k = 0; k < n; k++)
+    for (k = 1; k < n; k++)
     {
-        //J[k] = img->val[ROUND(p.x)][ROUND(p.y)];
-        J[k] =  iftImgVal2D(img, p.x, p.y);
-        //printf("intensity = %f \n",J[k] );
+        J+=  iftImgVal2D(img, (int)px, (int)py);
 
-
-        p.x = p.x + dx;
-        p.y = p.y + dy;
+        px = px + dx;
+        py = py + dy;
     }
 
-    return J;
+    return (int)J;
 }
 
 
@@ -100,6 +92,7 @@ int isValidPoint(iftImage *img, iftVoxel u)
     }
 }
 
+
 int findIntersection(iftMatrix *Po, iftImage *img, iftMatrix *N,int nx, int ny, iftVoxel *p1, iftVoxel *pn){
     float Nx, Ny;
     int x0, y0;
@@ -108,9 +101,9 @@ int findIntersection(iftMatrix *Po, iftImage *img, iftMatrix *N,int nx, int ny, 
 
     iftVoxel v;
     p1->x=pn->x=p1->y=pn->y=-1;
-    
+    float max=-9999999.9, min=9999999.9;
     Nx = N->val[0];
-    Nx = N->val[1];
+    Ny = N->val[1];
     y0 = Po->val[1];
     x0 = Po->val[0];   
 
@@ -118,28 +111,32 @@ int findIntersection(iftMatrix *Po, iftImage *img, iftMatrix *N,int nx, int ny, 
     if (Ny)
     {
         lamb=-y0/Ny;
-        v.x = ROUND(x0 + lamb*Nx);
-        v.y = ROUND(y0 + lamb*Ny);
+        v.x = x0 + lamb*Nx;
+        v.y = y0 + lamb*Ny;
         if (isValidPoint(img,v))
         {
             found+=1;
             p1->x = v.x;
             p1->y = v.y;
+            max=lamb;
+            min=lamb;
         }
         lamb=(ny-1-y0)/Ny;
-        v.x = ROUND(x0 + lamb*Nx);
-        v.y = ROUND(y0 + lamb*Ny);
-        if (isValidPoint(img,v))
+        v.x = x0 + lamb*Nx;
+        v.y = y0 + lamb*Ny;
+        if (isValidPoint(img,v) && ((lamb > max) || (lamb < min)))
         {
             found+=1;
             if (p1->x != -1)
             {
                 pn->x = v.x;
                 pn->y = v.y;    
+                max = lamb;
             }
             else{
                 p1->x = v.x;
                 p1->y = v.y;
+                min=lamb;
             }
         }
 
@@ -148,37 +145,52 @@ int findIntersection(iftMatrix *Po, iftImage *img, iftMatrix *N,int nx, int ny, 
     if (Nx)
     {
         lamb=-x0/Nx;
-        v.x = ROUND(x0 + lamb*Nx);
-        v.y = ROUND(y0 + lamb*Ny);
-        if (isValidPoint(img,v))
+        v.x = x0 + lamb*Nx;
+        v.y = y0 + lamb*Ny;
+        if (isValidPoint(img,v) && ((lamb > max) || (lamb < min)))
         {
             found+=1;
             if (p1->x != -1)
             {
                 pn->x = v.x;
-                pn->y = v.y;    
+                pn->y = v.y;
+                max = lamb;    
             }
             else{
                 p1->x = v.x;
                 p1->y = v.y;
+                min = lamb;
             }
         }
         lamb=(nx-1-x0)/Nx;
-        v.x = ROUND(x0 + lamb*Nx);
-        v.y = ROUND(y0 + lamb*Ny);
-        if (isValidPoint(img,v))
+        v.x = x0 + lamb*Nx;
+        v.y = y0 + lamb*Ny;
+        if (isValidPoint(img,v) && ((lamb > max) || (lamb < min)))
         {
             found+=1;
             if (p1->x != -1)
             {
                 pn->x = v.x;
-                pn->y = v.y;    
+                pn->y = v.y;  
+                max = lamb;  
             }
             else{
                 p1->x = v.x;
                 p1->y = v.y;
+                min = lamb;
             }
         }
+    }
+
+    if (p1->x > pn->x && p1->y > pn->y){
+        int auxX, auxY;
+        auxX = p1->x;
+        auxY = p1->y;
+        p1->x = pn->x;
+        p1->y = pn->y;
+        pn->x = auxX;
+        pn->y = auxY;
+        
     }
 
     return (found==2);
@@ -186,6 +198,33 @@ int findIntersection(iftMatrix *Po, iftImage *img, iftMatrix *N,int nx, int ny, 
 
 
 
+int LinearInterpolationValue(iftImage *img, iftVoxel v)
+{
+    iftVoxel u[4];
+    float dx = 1.0;
+    float dy = 1.0;
+    float  P12, P34;
+    int Pi;
+
+    if ((int) (v.x + 1.0) == img->xsize)
+        dx = 0.0;
+    if ((int) (v.y + 1.0) == img->ysize)
+        dy = 0.0;
+
+    //closest neighbour in each direction
+    u[0].x = (int)v.x;      u[0].y = (int)v.y;       
+    u[1].x = (int)(v.x + dx); u[1].y = (int)v.y;       
+    u[2].x = (int)v.x;      u[2].y = (int)(v.y + dy);  
+    u[3].x = (int)(v.x + dx); u[3].y = (int)(v.y + dy);  
+
+
+    P12 = iftImgVal2D(img,u[1].x,u[1].y) * (v.x - u[0].x) + iftImgVal2D(img,u[0].x,u[0].y) * (u[1].x - v.x);
+    P34 = iftImgVal2D(img,u[3].x,u[3].y) * (v.x - u[3].x) + iftImgVal2D(img,u[2].x,u[2].y) * (u[2].x - v.x);
+    Pi  = (int)P34 * (v.y - v.y) + P12 * (u[1].y - v.y);
+    
+
+    return Pi;
+}
 
 
 iftMatrix *imagePixelToMatrix(iftImage *img, int p)
@@ -206,22 +245,17 @@ iftImage *fastRadonTransform(iftImage *img)
     float D = sqrt(img->xsize*img->xsize + img->ysize*img->ysize);
 
     iftMatrix *normalVec;
-    int Nx, Ny,i;
-    float intensity;
     iftVoxel p1, pn;
-    float* lineVals;
+    int sumIntensities;
     int progress = 0;
 
-    Nx=Ny=D;
-    iftImage *R = iftCreateImage(Nx, Ny, 1);
+    iftImage *R = iftCreateImage(180, D, 1);
 
     for(int theta = 0; theta < 180; theta++) {
 
+
         //fprintf(stdout,"Progress: %f \r", (progress/180.0*100.0)); fflush(stdout);
         iftMatrix *M = createRadonMatrix(img, theta);
-
-        //iftImage *imgQ = iftCreateImage(D, D, 1);
-
 
         // normal calculation
         normalVec =  iftCreateMatrix(1, 4);
@@ -229,12 +263,11 @@ iftImage *fastRadonTransform(iftImage *img)
         iftMatrixElem(normalVec, 0, 1) = 1;
         iftMatrixElem(normalVec, 0, 2) = 0;
         iftMatrixElem(normalVec, 0, 3) = 0;
-
+        //iftMatrix *rotMatrix = iftRotationMatrix(IFT_AXIS_Z, theta);
         iftMatrix* normal = iftMultMatrices(M, normalVec);
-
         // percorrendo a linha
-        for(int p = 0; p < D-1; p++) {
-            
+        for(int p = 0; p < D; p++) {
+
             // Po = M-1 * p
             //iftMatrix *I_ = imagePixelToMatrix(img, p);
             iftMatrix *I_ = iftCreateMatrix(1, 4);
@@ -246,45 +279,52 @@ iftImage *fastRadonTransform(iftImage *img)
             //iftPrintMatrix(I_);
             //iftPrintMatrix(M);
             // rotating line
-            
+            //iftMatrix *rotMatrix = iftRotationMatrix(IFT_AXIS_Z, theta);
             iftMatrix *P0_line = iftMultMatrices(M,I_ );
+            //iftPrintMatrix(P0_line);
             
 
 
             // normal = M * normal
             //iftMatrix *rotMatrix = iftRotationMatrix(IFT_AXIS_Z, theta);
-
-            
-            
             
             if(findIntersection(P0_line, img, normal,img->xsize,img->ysize, &p1, &pn))
             {
-                printf("pn = %d,%d\n",pn.x, pn.y);
-                    
 
                 // chamar o DDA
                 // atribuir o valor obtido de J em Pi
+                if (p1.x == pn.x && p1.y == pn.y)
+                    iftImgVal2D(R, theta, p) = iftImgVal2D(img, p1.x, p1.y);
                 
-                lineVals = DDA(img, p1, pn);
+                
 
-                intensity = lineVals[0];
-                for (i = 1; i < line_len; i++)
-                    intensity+= lineVals[i];
+                //intensity = sumIntensities[0];
+                //for (i = 1; i < line_len; i++)
+                //    intensity+= sumIntensities[i];
                 
-                printf("%f \n",intensity);
-                iftImgVal2D(R, theta, p) = intensity;
+                //printf("%f \n",intensity);
+                else{
+                    sumIntensities = DDA(img, p1, pn);
+                    
+                    iftImgVal2D(R, theta, p) = sumIntensities;
+                }
 
                 //R->val[p] = intensity;
-
             }
             else{
                 // sem intercessao
                 iftImgVal2D(R, theta, p) = 0;
                 //R->val[p] = 0;
             }
+
+            //printf("(p,theta) =  (%d, %d) \n",p,theta );
             iftDestroyMatrix(&P0_line);
+            iftDestroyMatrix(&I_);
         }
 
+        iftDestroyMatrix(&M);
+        iftDestroyMatrix(&normalVec);
+        iftDestroyMatrix(&normal);
         progress++;   
     }
 
@@ -318,101 +358,4 @@ int main(int argc, char *argv[])
 }
 
 
-// int findIntersection(iftMatrix *Po, iftImage *img, iftMatrix *N,int nx, int ny, iftVoxel *p1, iftVoxel *pn){
-//     float lamb1,lamb2,lamb3,lamb4;    
-//     int i;
-//     float max=-99999999,min=999999999.0;
-//     iftVoxel v1, v2;
-//     p1->x=pn->x=p1->y=pn->y=-1;
-
-
-//     //lamb1 = -(Po->val[1])/iftMax(N->val[1],1);
-//     //lamb2 = (ny -1 - Po->val[1])/iftMax(N->val[1],1);
-//     //lamb3 = -(Po->val[0])/iftMax(N->val[0],1);
-//     //lamb4 = (nx - 1 - Po->val[0])/iftMax(N->val[0],1);
-//     if (N->val[1]==0)
-//     {
-//         lamb1 = (-Po->val[1])/iftMax(N->val[1],1);
-//         lamb2 = (ny -1 - Po->val[1])/iftMax(N->val[1],1);
-//     }
-//     else{
-//         lamb1 = (-Po->val[1])/N->val[1];
-//         lamb2 = (ny -1 - Po->val[1])/N->val[1];
-//     }
-//     if (N->val[0]==0)
-//     {
-//         lamb3 = (-Po->val[0])/iftMax(N->val[0],1);
-//         lamb4 = (nx - 1 - Po->val[0])/iftMax(N->val[0],1);
-//     }
-//     else{
-//         lamb3 = (-Po->val[0])/N->val[0];
-//         lamb4 = (nx - 1 - Po->val[0])/N->val[0];
-//     }
-
-
-//     float lambs[] = {lamb1,lamb2,lamb3,lamb4};
-
-//     for(i=0; i < 4; i++){
-        
-
-//         if (lambs[i]>max){
-
-//             if (N->val[0]==0.0)
-//                 v2.x = ROUND(Po->val[0] + lambs[i] * 1);
-//             else
-//                 v2.x = ROUND(Po->val[0] + lambs[i] * N->val[0]);
-//             if (N->val[1]==0.0)
-//                 v2.y = ROUND(Po->val[1] + lambs[i] * 1);
-//             else
-//                 v2.y = ROUND(Po->val[1] + lambs[i] * N->val[1]);
-            
-//             if (isValidPoint(img, v2)){
-//                 pn->x=v2.x;
-//                 pn->y=v2.y;
-//                 max = lambs[i];
-//             }
-//         }
-//         if (lambs[i]<min)
-//             min = lambs[i];
-//     }
-
-//     if (N->val[0]==0.0)
-//         v1.x = ROUND(Po->val[0] + min * 1);
-//     else
-//         v1.x = ROUND(Po->val[0] + min * N->val[0]);
-//     if (N->val[1]==0.0)
-//         v1.y = ROUND(Po->val[1] + min * 1);
-//     else
-//         v1.y = ROUND(Po->val[1] + min * N->val[1]);
-    
-//     if (isValidPoint(img, v1)){
-//         p1->x=v1.x;
-//         p1->y=v1.y;
-//     }
-
-//     // if (N->val[0]==0.0)
-//     //     v2.x = ROUND(Po->val[0] + max * 1);
-//     // else
-//     //     v2.x = ROUND(Po->val[0] + max * N->val[0]);
-//     // if (N->val[1]==0.0)
-//     //     v2.y = ROUND(Po->val[1] + max * 1);
-//     // else
-//     //     v2.y = ROUND(Po->val[1] + max * N->val[1]);
-
-//     // //printf("%lf, %lf \n", min,max);
-//     // printf("%d, %d \n", v2.x,v2.y);
-
-//     // if (isValidPoint(img, v2)){
-        
-//     //     pn->x=v2.x;
-//     //     pn->y=v2.y;
-//     // }
-
-//     if ((p1->x != -1) && (pn->x != -1) && (p1->y != -1) && (pn->y != -1)){
-        
-//         return 1;
-//     }
-//     else
-//         return 0;
-// }
 
