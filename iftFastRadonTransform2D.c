@@ -31,6 +31,36 @@ iftMatrix *createRadonMatrix(iftImage *img, int theta)
     return resMatrix;
 }
 
+
+int LinearInterpolationValue(iftImage *img, float x, float y)
+{
+    iftVoxel u[4];
+    float dx = 1.0;
+    float dy = 1.0;
+    float  P12, P34;
+    int Pi;
+
+    if ((int) (x + 1.0) == img->xsize)
+        dx = 0.0;
+    if ((int) (y + 1.0) == img->ysize)
+        dy = 0.0;
+
+    //closest neighbour in each direction
+    u[0].x = (int)x;      u[0].y = (int)y;       
+    u[1].x = (int)(x + dx); u[1].y = (int)y;       
+    u[2].x = (int)x;      u[2].y = (int)(y + dy);  
+    u[3].x = (int)(x + dx); u[3].y = (int)(y + dy);  
+
+
+    P12 = (float)iftImgVal2D(img,u[1].x,u[1].y) * (x - u[0].x) + (float)iftImgVal2D(img,u[0].x,u[0].y) * (u[1].x - x);
+    P34 = (float)iftImgVal2D(img,u[3].x,u[3].y) * (x - u[2].x) + (float)iftImgVal2D(img,u[2].x,u[2].y) * (u[3].x - x);
+    Pi  = (int)P34 * (y - u[0].y) + P12 * (u[2].y - y);
+    
+
+    return Pi;
+}
+
+
 int DDA(iftImage *img, iftVoxel p1, iftVoxel pn)
 {
     int n, k;
@@ -67,8 +97,10 @@ int DDA(iftImage *img, iftVoxel p1, iftVoxel pn)
     // TODO: calcular I como interpolacao
 
     for (k = 1; k < n; k++)
-    {
-        J+=  iftImgVal2D(img, (int)px, (int)py);
+    {   
+        J+=  (float)LinearInterpolationValue(img, px, py);
+        //J+=  iftImgVal2D(img, (int)px, (int)py);
+        //J+=  (float)LinearInterpolationValue(img, px, py);
 
         px = px + dx;
         py = py + dy;
@@ -76,7 +108,6 @@ int DDA(iftImage *img, iftVoxel p1, iftVoxel pn)
 
     return (int)J;
 }
-
 
 
 int isValidPoint(iftImage *img, iftVoxel u)
@@ -106,7 +137,6 @@ int findIntersection(iftMatrix *Po, iftImage *img, iftMatrix *N,int nx, int ny, 
     Ny = N->val[1];
     y0 = Po->val[1];
     x0 = Po->val[0];   
-
 
     if (Ny)
     {
@@ -198,33 +228,7 @@ int findIntersection(iftMatrix *Po, iftImage *img, iftMatrix *N,int nx, int ny, 
 
 
 
-int LinearInterpolationValue(iftImage *img, iftVoxel v)
-{
-    iftVoxel u[4];
-    float dx = 1.0;
-    float dy = 1.0;
-    float  P12, P34;
-    int Pi;
 
-    if ((int) (v.x + 1.0) == img->xsize)
-        dx = 0.0;
-    if ((int) (v.y + 1.0) == img->ysize)
-        dy = 0.0;
-
-    //closest neighbour in each direction
-    u[0].x = (int)v.x;      u[0].y = (int)v.y;       
-    u[1].x = (int)(v.x + dx); u[1].y = (int)v.y;       
-    u[2].x = (int)v.x;      u[2].y = (int)(v.y + dy);  
-    u[3].x = (int)(v.x + dx); u[3].y = (int)(v.y + dy);  
-
-
-    P12 = iftImgVal2D(img,u[1].x,u[1].y) * (v.x - u[0].x) + iftImgVal2D(img,u[0].x,u[0].y) * (u[1].x - v.x);
-    P34 = iftImgVal2D(img,u[3].x,u[3].y) * (v.x - u[3].x) + iftImgVal2D(img,u[2].x,u[2].y) * (u[2].x - v.x);
-    Pi  = (int)P34 * (v.y - v.y) + P12 * (u[1].y - v.y);
-    
-
-    return Pi;
-}
 
 
 iftMatrix *imagePixelToMatrix(iftImage *img, int p)
