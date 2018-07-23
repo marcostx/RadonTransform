@@ -5,7 +5,7 @@
 
 int sign( int x ){
     if(x >= 0)
-        return 1;    
+        return 1;
     return -1;
 }
 
@@ -24,40 +24,11 @@ iftMatrix *createRadonMatrix(iftImage *img, int theta)
     float D = sqrt(img->xsize*img->xsize + img->ysize*img->ysize);
     iftVector v2 = {.x = -(D / 2.0), .y = -(D / 2.0), .z = 0.0};
     iftMatrix *transMatrix2 = iftTranslationMatrix(v2);
-    
+
 
     resMatrix = iftMultMatricesChain(3, transMatrix1, rotMatrix, transMatrix2);
 
     return resMatrix;
-}
-
-
-int LinearInterpolationValue(iftImage *img, float x, float y)
-{
-    iftVoxel u[4];
-    float dx = 1.0;
-    float dy = 1.0;
-    float  P12, P34;
-    int Pi;
-
-    if ((int) (x + 1.0) == img->xsize)
-        dx = 0.0;
-    if ((int) (y + 1.0) == img->ysize)
-        dy = 0.0;
-
-    //closest neighbour in each direction
-    u[0].x = (int)x;      u[0].y = (int)y;       
-    u[1].x = (int)(x + dx); u[1].y = (int)y;       
-    u[2].x = (int)x;      u[2].y = (int)(y + dy);  
-    u[3].x = (int)(x + dx); u[3].y = (int)(y + dy);  
-
-
-    P12 = (float)iftImgVal2D(img,u[1].x,u[1].y) * (x - u[0].x) + (float)iftImgVal2D(img,u[0].x,u[0].y) * (u[1].x - x);
-    P34 = (float)iftImgVal2D(img,u[3].x,u[3].y) * (x - u[2].x) + (float)iftImgVal2D(img,u[2].x,u[2].y) * (u[3].x - x);
-    Pi  = (int)P34 * (y - u[0].y) + P12 * (u[2].y - y);
-    
-
-    return Pi;
 }
 
 
@@ -73,17 +44,17 @@ int DDA(iftImage *img, iftVoxel p1, iftVoxel pn)
 
 
     if (p1.x == pn.x && p1.y == pn.y)
-        n=1; 
+        n=1;
     else{
         Dx=pn.x - p1.x;
-        Dy=pn.y - p1.y; 
+        Dy=pn.y - p1.y;
 
         if( abs(Dx) >= abs(Dy) ){
             n = abs(Dx)+1;
             dx = sign(Dx);
             dy = (dx * Dy)/Dx;
         }
-        else{ 
+        else{
             n = abs(Dy)+1;
             dy = sign(Dy);
             dx = (dy * Dx)/Dy;
@@ -92,14 +63,13 @@ int DDA(iftImage *img, iftVoxel p1, iftVoxel pn)
 
     px = p1.x;
     py = p1.y;
-    
+
 
     // TODO: calcular I como interpolacao
 
     for (k = 1; k < n; k++)
-    {   
-        J+=  (float)LinearInterpolationValue(img, px, py);
-        //J+=  iftImgVal2D(img, (int)px, (int)py);
+    {
+        J+=  iftImgVal2D(img, (int)px, (int)py);
         //J+=  (float)LinearInterpolationValue(img, px, py);
 
         px = px + dx;
@@ -136,7 +106,7 @@ int findIntersection(iftMatrix *Po, iftImage *img, iftMatrix *N,int nx, int ny, 
     Nx = N->val[0];
     Ny = N->val[1];
     y0 = Po->val[1];
-    x0 = Po->val[0];   
+    x0 = Po->val[0];
 
     if (Ny)
     {
@@ -160,7 +130,7 @@ int findIntersection(iftMatrix *Po, iftImage *img, iftMatrix *N,int nx, int ny, 
             if (p1->x != -1)
             {
                 pn->x = v.x;
-                pn->y = v.y;    
+                pn->y = v.y;
                 max = lamb;
             }
             else{
@@ -184,7 +154,7 @@ int findIntersection(iftMatrix *Po, iftImage *img, iftMatrix *N,int nx, int ny, 
             {
                 pn->x = v.x;
                 pn->y = v.y;
-                max = lamb;    
+                max = lamb;
             }
             else{
                 p1->x = v.x;
@@ -201,8 +171,8 @@ int findIntersection(iftMatrix *Po, iftImage *img, iftMatrix *N,int nx, int ny, 
             if (p1->x != -1)
             {
                 pn->x = v.x;
-                pn->y = v.y;  
-                max = lamb;  
+                pn->y = v.y;
+                max = lamb;
             }
             else{
                 p1->x = v.x;
@@ -220,7 +190,7 @@ int findIntersection(iftMatrix *Po, iftImage *img, iftMatrix *N,int nx, int ny, 
         p1->y = pn->y;
         pn->x = auxX;
         pn->y = auxY;
-        
+
     }
 
     return (found==2);
@@ -286,12 +256,12 @@ iftImage *fastRadonTransform(iftImage *img)
             //iftMatrix *rotMatrix = iftRotationMatrix(IFT_AXIS_Z, theta);
             iftMatrix *P0_line = iftMultMatrices(M,I_ );
             //iftPrintMatrix(P0_line);
-            
+
 
 
             // normal = M * normal
             //iftMatrix *rotMatrix = iftRotationMatrix(IFT_AXIS_Z, theta);
-            
+
             if(findIntersection(P0_line, img, normal,img->xsize,img->ysize, &p1, &pn))
             {
 
@@ -299,17 +269,17 @@ iftImage *fastRadonTransform(iftImage *img)
                 // atribuir o valor obtido de J em Pi
                 if (p1.x == pn.x && p1.y == pn.y)
                     iftImgVal2D(R, theta, p) = iftImgVal2D(img, p1.x, p1.y);
-                
-                
+
+
 
                 //intensity = sumIntensities[0];
                 //for (i = 1; i < line_len; i++)
                 //    intensity+= sumIntensities[i];
-                
+
                 //printf("%f \n",intensity);
                 else{
                     sumIntensities = DDA(img, p1, pn);
-                    
+
                     iftImgVal2D(R, theta, p) = sumIntensities;
                 }
 
@@ -329,7 +299,7 @@ iftImage *fastRadonTransform(iftImage *img)
         iftDestroyMatrix(&M);
         iftDestroyMatrix(&normalVec);
         iftDestroyMatrix(&normal);
-        progress++;   
+        progress++;
     }
 
     return R;
@@ -360,6 +330,3 @@ int main(int argc, char *argv[])
 
     return(0);
 }
-
-
-
